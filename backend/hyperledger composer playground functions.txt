@@ -1,0 +1,248 @@
+query selectDocumentByHash {
+   description: "Select document by hashCode"
+   statement:
+       SELECT org.pmc.model.DocSubmission
+           WHERE (hashCode==_$hash)
+ }
+ 
+ ------------------------------------------------------------------------------------------------------------
+ 
+ rule NetworkAdminUser {
+    description: "Grant business network administrators full access to user resources"
+    participant: "org.hyperledger.composer.system.NetworkAdmin"
+    operation: ALL
+    resource: "**"
+    action: ALLOW
+}
+
+rule NetworkAdminSystem {
+    description: "Grant business network administrators full access to system resources"
+    participant: "org.hyperledger.composer.system.NetworkAdmin"
+    operation: ALL
+    resource: "org.hyperledger.composer.system.**"
+    action: ALLOW
+}
+
+rule EnableDocSubmission {
+    description: "Enable DocSubmitter to submit documents"
+    participant: "org.pmc.model.DocSubmitter"
+    operation: ALL
+    resource: "org.pmc.model.SubmitDocument"
+    action: ALLOW
+}
+/*
+rule EnableGetSubmitterName {
+    description: "Enable DocSubmitter to get submitter name"
+    participant: "org.pmc.model.DocSubmitter"
+    operation: ALL
+    resource: "org.pmc.model.GetSubmitterName"
+    action: ALLOW
+}
+*/
+/*
+rule EnableViewCustodyChain{
+    description: "Enable DocSubmitter to get custody chain"
+    participant: "org.pmc.model.DocSubmitter"
+    operation: ALL
+    resource: "org.pmc.model.ViewCustodyChain"
+    action: ALLOW
+}
+*/
+rule ReadNetwork {
+    description: "Allow all participants access to all resources"
+    participant: "org.pmc.model.DocSubmitter"
+    operation: READ
+    resource: "**"
+    action: ALLOW
+}
+
+-------------------------------------------------------------------------------
+
+'use strict';
+/*
+ * Write your transction processor functions here
+ */
+
+/*
+ * Sample transaction
+ * @param {org.pmc.docchain.ChangeAssetValue} changeAssetValue
+ * @transaction
+ */
+
+/*
+function onChangeAssetValue(changeAssetValue) {
+    var assetRegistry;
+    var id = changeAssetValue.relatedAsset.assetId;
+    return getAssetRegistry('org.pmc.docchain.SampleAsset')
+        .then(function(ar) {
+            assetRegistry = ar;
+            return assetRegistry.get(id);
+        })
+        .then(function(asset) {
+            asset.value = changeAssetValue.newValue;
+            return assetRegistry.update(asset);
+        });
+}
+
+*/
+
+/**
+ * New script file
+ */
+/*
+ @param {org.pmc.model.GetSubmitterName} curDoc
+ @transaction
+*/
+/*
+function GetSubmitterName(curDoc) {
+	
+	var cursub=curDoc.currentDoc.submitter.firstName+" "+curDoc.currentDoc.submitter.firstName+" "+curDoc.currentDoc.submitter.emailAddress;
+	console.log(cursub);
+  return cursub;
+}
+*/
+/**
+ @param {org.pmc.model.SubmitDocument} subDoc
+ @transaction
+*/
+function SubmitDocument(subDoc) {
+  // Get the  asset registry.
+return getAssetRegistry('org.pmc.model.DocSubmission')
+  .then(function (docAssetRegistry) 
+  {
+	  
+  return docAssetRegistry.exists(subDoc.hashCode).then(function(exists)
+  {
+	  if (!exists)
+	  {
+		  
+		  return getParticipantRegistry('org.pmc.model.DocSubmitter')
+			.then(function (participantRegistry) 
+			{
+				
+				return participantRegistry.exists(subDoc.submitterEmail).then(function(pexists)
+				{
+				
+					if (pexists)
+					{
+						var factory = getFactory();
+						// Create the doc submission
+						var newDoc = factory.newResource('org.pmc.model', 'DocSubmission', subDoc.hashCode);
+						newDoc.submitter=factory.newRelationship('org.pmc.model',"DocSubmitter",subDoc.submitterEmail); 
+						return docAssetRegistry.exists(subDoc.prevHashcode).then (function(prevexists)
+						{
+							if (prevexists)
+							{
+								newDoc.derivedFrom=factory.newRelationship('org.pmc.model','DocSubmission',subDoc.prevHashcode);
+							}
+							else
+							{
+								//first one
+								newDoc.derivedFrom=factory.newRelationship('org.pmc.model','DocSubmission',"1634");
+							}
+							return docAssetRegistry.add(newDoc);});
+					}
+			});
+		});
+	  }
+	 }
+	);
+  });
+       
+	   
+}
+  
+
+
+/*
+ @param {org.pmc.model.GetPreviousVersionSubmitter} curDoc
+ @transaction
+*/
+/*
+function GetPreviousVersionSubmitter(curDoc) {
+	var presub=curDoc.currentDoc.derivedFrom.submitter.firstName+" "+curDoc.currentDoc.derivedFrom.submitter.firstName+" "+curDoc.currentDoc.derivedFrom.submitter.emailAddress;
+	console.log(presub);
+	return presub;
+	
+}  
+
+*/
+
+
+/*
+function RecursiveSubmitterDisplay(upchain,docAsset)
+{
+  	if (docAsset.hashCode=="1634")
+    {
+      return upchain;
+    }
+  else
+    
+  {
+var cursub=docAsset.submitter.firstName+" "+docAsset.submitter.lastName+" "+docAsset.submitter.emailAddress;
+
+		//console.log(docAsset.submitter.firstName);
+		var alltogether=upchain+"\n"+cursub;
+    return RecursiveSubmitterDisplay(alltogether,docAsset.derivedFrom);
+    
+  }
+}
+*/
+/*
+ @param {org.pmc.model.ViewCustodyChain} curDoc
+ @transaction
+*/
+/*
+function ViewCustodyChainr(curDoc) {
+  return RecursiveSubmitterDisplay("",curDoc.currentDoc);
+}  
+*/
+
+
+
+---------------------------------------------------------------------------------------------------------------------------
+
+/**
+ * New model file
+ */
+
+namespace org.pmc.model
+asset DocSubmission identified by hashCode
+{
+  o String hashCode
+  --> DocSubmitter submitter
+  --> DocSubmission derivedFrom
+}
+
+participant DocSubmitter identified by emailAddress {
+  o String emailAddress
+  o String firstName
+  o String lastName
+}
+/*
+transaction GetSubmitterName
+{
+  
+ --> DocSubmission currentDoc 
+}
+*/
+
+/*
+transaction GetPreviousVersionSubmitter
+{
+  
+ --> DocSubmission currentDoc 
+}
+*/
+transaction SubmitDocument
+{
+  o String submitterEmail
+  o String hashCode
+  o String prevHashcode
+}
+/*
+transaction ViewCustodyChain
+{
+  --> DocSubmission currentDoc
+}
+*/
